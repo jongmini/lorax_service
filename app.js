@@ -80,58 +80,53 @@ app.post('/:reading/:pi_id/:sensor_id', function(req, res){
   console.log(reading);
   console.log(date);
 
- 
-    client.query('SELECT redline, ownedby FROM piunits INNER JOIN soildata ON pi_id = serial_num WHERE soildata.sensor_id = piunits.sensor_id Limit 1',
+  client.query('SELECT redline, ownedby FROM piunits INNER JOIN soildata ON pi_id = serial_num WHERE soildata.sensor_id = piunits.sensor_id Limit 1',
     function(err, result){
       // console.log((result.rows[0].redline), "this is the result");
       var redline_value = result.rows[0].redline; 
       var ownedby = result.rows[0].ownedby;
       var dryness;
       if(reading > redline_value){
-        dryness = true;
+          dryness = true;
         } else {
           dryness = false;
         }
 
-      if(dryness){
-        client.query('SELECT * FROM soildata WHERE pi_id = \''+ pi_id +'\' AND sensor_id = '+sensor_id + 'AND isdry = false ORDER BY recordtime desc limit 1', 
+      client.query('SELECT * FROM soildata WHERE pi_id = \''+ pi_id +'\' AND sensor_id = '+sensor_id + 'AND isdry = false ORDER BY recordtime desc limit 1', 
         function(err, result){
-          if (err){console.log(err);}
-
-          var last_tweet = new Date(result.rows[0].recordtime);
-          var currentdate = new Date(date);
-          var difference= (currentdate-last_tweet);
-          difference = (difference/3600000);
-          //case statement goes here
-          switch(difference){
-            //with this set up, it'll always tweet after the 72 hour mark
-            case difference > 72 && difference <= 96:
-            request.post("http://projectlorax.herokuapp.com/notify/" + ownedby+"/"+pi_id+"/"+sensor_id +"/72");
-              break;
-            case difference > 48 && difference <= 72:
-              request.post("http://projectlorax.herokuapp.com/notify/" + ownedby+"/"+pi_id+"/"+sensor_id +"/48");
-              break;
-            case difference > 24 && difference <= 48:
-              request.post("http://projectlorax.herokuapp.com/notify/" + ownedby+"/"+pi_id+"/"+sensor_id +"/24");
-              break; 
-            case difference > 12 && difference <=24:
-               request.post("http://projectlorax.herokuapp.com/notify/" + ownedby+"/"+pi_id+"/"+sensor_id +"/12");
-              break; 
+          if (err){
+            console.log(err, "still calibrating, please water your plant");
+          } else {
+            if(dryness){
+              var last_tweet = new Date(result.rows[0].recordtime);
+              var currentdate = new Date(date);
+              var difference= (currentdate-last_tweet);
+              difference = (difference/3600000);
+              //case statement goes here
+              switch(difference){
+                //with this set up, it'll always tweet after the 72 hour mark
+                case difference > 72 && difference <= 96:
+                request.post("http://projectlorax.herokuapp.com/notify/" + ownedby+"/"+pi_id+"/"+sensor_id +"/72");
+                  break;
+                case difference > 48 && difference <= 72:
+                  request.post("http://projectlorax.herokuapp.com/notify/" + ownedby+"/"+pi_id+"/"+sensor_id +"/48");
+                  break;
+                case difference > 24 && difference <= 48:
+                  request.post("http://projectlorax.herokuapp.com/notify/" + ownedby+"/"+pi_id+"/"+sensor_id +"/24");
+                  break; 
+                case difference > 12 && difference <=24:
+                   request.post("http://projectlorax.herokuapp.com/notify/" + ownedby+"/"+pi_id+"/"+sensor_id +"/12");
+                  break; 
+              }
+            }
           }
+        });
 
         client.query('INSERT INTO soildata(reading, pi_id, sensor_id, recordtime, isdry) VALUES($1, $2, $3, $4, $5)', [reading, pi_id, sensor_id, date, dryness],
-            function(err, result){
-                if (err){console.log(err, "error inserting to PG");}
-                res.send(req.params);
-              });
-        });
-      }else{
-        client.query('INSERT INTO soildata(reading, pi_id, sensor_id, recordtime, isdry) VALUES($1, $2, $3, $4, $5)', [reading, pi_id, sensor_id, date, dryness],
-            function(err, result){
-                if (err){console.log(err, "error inserting to PG");}
-                res.send(req.params);
-        });
-      }
+          function(err, result){
+              if (err){console.log(err, "error inserting to PG");}
+              res.send(req.params);
+          });
     });
 });
 
